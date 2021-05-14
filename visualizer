@@ -20,7 +20,7 @@ CRGB leds[NUM_LEDS];
 
 int avg;
 int updateLEDS = 10;
-int analogPin = A1; // MSGEQ7 OUT
+int analogPin = A0; // MSGEQ7 OUT
 int strobePin = 2; // MSGEQ7 STROBE
 int resetPin = 3; // MSGEQ7 RESET
 int spectrumValue[7];
@@ -233,7 +233,7 @@ void setup()
   pinMode(resetPin, OUTPUT);
  
   // Set analogPin's reference voltage
-  analogReference(DEFAULT); // 5V
+  //analogReference(DEFAULT); // 5V //commented out due to not being on ESP8266 Library
  
   // Set startup values for pins
   digitalWrite(resetPin, LOW);
