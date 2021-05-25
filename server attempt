@@ -1,0 +1,182 @@
+#include <ESP8266WiFi.h>        // Include the Wi-Fi library
+#include <WiFiClient.h>
+#include <ESP8266WiFiMulti.h> 
+#include <ESP8266mDNS.h>
+#include <ESP8266WebServer.h>
+#include <FastLED.h>
+
+
+#define NUM_LEDS 300
+#define LED_TYPE WSB2812b
+
+#define DATA_PIN D4
+
+
+CRGB leds[NUM_LEDS];
+
+
+
+const char *ssid = "Spectre"; // The name of the Wi-Fi network that will be created
+const char *password = "fuckacode";   // The password required to connect to it, leave blank for an open network
+
+IPAddress ip(192,168,1,1);
+IPAddress gateway(192,168,1,1);
+IPAddress sub(255,255,255,0);
+
+//create server
+ESP8266WebServer server(80);
+
+int brightness = 50;
+int lightStatus;
+int volume = 1;
+int color_h = 2;
+int pitch_h = 3;
+int m = 4;
+int beats = 5;
+
+void setup() {
+  Serial.begin(115200);
+  WiFi.mode(WIFI_AP);
+  WiFi.softAPConfig(ip,gateway,sub);
+  WiFi.softAP(ssid,password);
+  Serial.println();
+  Serial.print("IpAdress:");
+  Serial.println(WiFi.localIP());
+  
+  server.on("/",handle_connect);
+  
+  ///server.on("/vol",vol);//check
+  server.on("/update",handle_update);
+  ///server.on("/color",color);//check
+  ///server.on("/pitch",pitch);//check
+  ///server.on("/m",repeat);//check
+  ///server.on("bpm",bpm); //check
+  server.on("/off",off);
+  server.on("/audio",audio);
+  server.on("/confetti",confetti);
+  server.begin();
+
+  LEDS.addLeds<WS2812,DATA_PIN,RGB>(leds,NUM_LEDS);
+  LEDS.setBrightness(84);
+  for(int i = 0; i < NUM_LEDS; i++){
+    leds[i] = CRGB(0,0,0);
+  }
+}
+
+typedef void (*Spectremodes[])();
+Spectremodes pos = {off_fx,audio_fx,confetti_fx};
+
+
+void loop() { 
+  pos[lightStatus]();
+  server.handleClient();
+}
+
+void handle_connect(){
+  server.send(200,"text/plain","You are connected");
+}
+
+
+
+void audio(){
+  volume = server.arg("volume").toInt();
+  Serial.print(volume);
+  Serial.print(" ");
+  color_h = server.arg("color_h").toInt();
+  Serial.print(color_h);
+  Serial.print(" ");
+  pitch_h= server.arg("pitch_h").toInt();
+  Serial.print(pitch_h);
+  Serial.print(" ");
+  m = server.arg("repeat").toInt();
+  Serial.print(m);
+  Serial.print(" ");
+  beats = server.arg("bpm").toInt();
+  Serial.print(beats);
+  Serial.print(" ");
+  Serial.println("");
+  lightStatus = 1;
+  Serial.println("music started");
+}
+
+void confetti(){
+  lightStatus = 3;
+  Serial.println("confetti started");
+}
+
+void off(){
+  lightStatus = 0;
+  Serial.println("off started");
+}
+/*
+void vol(){
+  server.send(200,"text/plain",String(volume));
+  volume = server.arg("volume").toInt();
+}
+*/
+void handle_update(){
+  
+}
+
+void off_fx(){
+  do{                             //Start of a loop
+    brightness = brightness - 10;           //Subtract 10 from the bright variable and save it
+    FastLED.setBrightness(brightness);  //Set LED strip Brightness to the value storged in "Bright"
+    FastLED.show();                 //Update LED strip
+    delay(10);                      //Wait for 20ms
+    }while(brightness > 0);             //Go back to start of the loop if Bight is bigger then 0
+    FastLED.clear();
+    brightness = 50;                    //turn of LED strip
+    FastLED.setBrightness(brightness); 
+    FastLED.show();
+}
+
+
+void audio_fx(){
+ /* Offset the LEDS to the right by the amount that will be updated */
+  for(int i = NUM_LEDS - 1; i >= beats; i--){
+    leds[i] = leds[i - beats];
+  }
+
+
+  for(int i = 0; i < beats; i++){
+    leds[i] = CHSV(pitch_h,color_h,volume - 50);
+  }
+
+
+  /* A succession of the same frequncy 4 times will result in a change of color at a random pace */
+
+  if(m >= 4){
+    for(int i = 0; i < m*2; i++){
+    leds[random(m,i)] = CHSV(pitch_h,color_h,volume -50);
+    }
+        m = 0;
+  }
+    FastLED.show();
+    pitch_h = 0;
+    color_h = 255;
+}
+
+void confetti_fx(){
+  // random colored speckles that blink in and fade smoothly
+  fadeToBlackBy( leds, NUM_LEDS, 10);
+  int pos = random16(NUM_LEDS);
+  leds[pos] += CHSV( random8(64), 200, 255);
+}
+
+void color(){
+  server.send(200,"text/plain",String(color_h));
+}
+/*
+void pitch(){
+  server.send(200,"text/plain",String(pitch_h));
+}
+
+void fast(){
+  server.send(200,"text/plain",String(m));
+}
+
+void bpm(){
+  server.send(200,"text/plain",String(beats));
+}
+*/
