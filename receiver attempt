@@ -1,0 +1,267 @@
+
+#include <ESP8266WiFi.h>
+#include <ESP8266HTTPClient.h>
+
+const char* ssid = "Spectre";
+const char *password = "fuckacode";   // The password required to connect to it, leave blank for an open network
+
+const char* host = "192.168.1.1";
+
+WiFiClient client;
+HTTPClient http;
+
+int avg;
+int updateLEDS = 10;
+int analogPin = A0; // MSGEQ7 OUT
+int strobePin = D2; // MSGEQ7 STROBE
+int resetPin = D3; // MSGEQ7 RESET
+int spectrumValue[7];
+
+ 
+// MSGEQ7 OUT pin produces values around 50-80
+// when there is no input, so use this value to
+// filter out a lot of the chaff.
+int filterValue = 80;
+
+
+class Color{
+  private:
+
+  /* Set initial values for pitch, color and volume. Volume is set to 50 to account for offset for the lights to be off when there is no audio */
+
+
+  bool dull = false;
+  bool pitchy = false;
+  bool norm = false;
+  int low;
+  int med;
+  int high;
+  
+  int _mode = 0;
+  
+  
+  public:
+  int repeat = 0;
+  uint8_t pitch_hue = 255;
+  uint8_t color_hue = 255;
+  uint8_t volume = 50;
+  int bpm;
+  int getPitch_Hue();
+  int getColor_Hue();
+  int getVolume();
+  void setHue(int vals[]);
+  void setVolume(int vals[]);
+  void animate(int vals[]);
+  void freq(int vals[]);
+  void spd(int vals[]);
+
+};
+
+/* Accounts for the first four frequencies, being the most common and finds the average to calculate the volume */
+
+void Color :: setVolume(int vals[]){
+  for (int i = 0; i < 4; i++){
+    /*Get volume to determine brightness*/
+    volume += int(spectrumValue[i]/4);
+  }
+  
+}
+
+
+/* Seperate the 7 bands bands into three different frequencies */
+
+void Color:: freq(int vals[]){
+  low = vals[0] + vals[1];
+  med = vals[2] + vals[3] + vals[4];
+  high = vals[5] + vals[6];
+
+  if(low > high && low > med){
+    dull = true;
+  }
+  else if(high > med && med > low){
+    high = true;
+  }
+  else{
+    norm = true;
+  }
+}
+
+void Color :: setHue(int vals[]){
+  freq(vals);
+
+  /* Utilize the switches in order to calculate the different hues and pitches the leds will show in accordance to the audio in */
+
+  switch(dull){
+    case true:
+      pitch_hue = 0.30*low + high;
+      break;
+    case false:
+      color_hue -= 0.25*low;
+      break;
+  }
+
+  switch(norm){
+    case true:
+      pitch_hue = 0.15*med + low;
+      break;
+    case false:
+      color_hue -= 0.25*med;
+  }
+  switch(pitchy){
+    case true:
+      pitch_hue = 0.15*high + med;
+      break;
+    case false:
+      color_hue -= 0.25*high;
+  }
+}
+
+int Color:: getPitch_Hue(){
+  return pitch_hue;
+}
+
+int Color:: getColor_Hue(){
+  return color_hue;
+}
+
+int Color:: getVolume(){
+  return volume;
+}
+
+
+void Color:: spd (int vals[]){
+  int _mode = 0;
+  
+  /* Calculate which frequency is the highest across the 7 bands of the graphic equalizer */
+
+  for(int i = 0; i < sizeof(vals)/sizeof(vals[0]) - 1 ;i++){
+      if( vals[i] < vals[i +1]){
+          _mode = i;
+      }
+  }
+
+
+ /* Determine the amount of leds that will be updated based on which frequency has the highest value. The lower the frequency, the less LEDS update */
+
+  switch(_mode){
+  case 0:
+      bpm = 3;
+      break;
+  case 1:
+      bpm = 5;
+      break;
+  case 2:
+      bpm = 7;
+      break;
+  case 3:
+      bpm = 13;
+      break;
+  case 4: 
+      bpm = 15;
+      break;
+  case 5:
+      bpm = 17;
+      break;
+  case 6:
+      bpm = 19 ;
+      break;
+  }
+}
+void Color::animate(int vals[]){
+
+  
+  spd(vals);
+
+  /* Calculate for a repeat of pitch in succession */
+  if(getPitch_Hue() > (getVolume()-50)){
+    repeat += 1;
+  }
+  setHue(vals);
+  setVolume(vals);
+}
+
+
+
+
+const int sleepTimeSeconds = 1;
+
+void setup() {
+
+  // Read from MSGEQ7 OUT
+  pinMode(analogPin, INPUT);
+  // Write to MSGEQ7 STROBE and RESET
+  pinMode(strobePin, OUTPUT);
+  pinMode(resetPin, OUTPUT);
+
+  // Set startup values for pins
+  digitalWrite(resetPin, LOW);
+  digitalWrite(strobePin, HIGH);
+  Serial.begin(115200);
+  WiFi.begin(ssid,password);
+  while(WiFi.status() != WL_CONNECTED){
+    Serial.print(".");
+    delay(500);
+  }
+  Serial.println("Connected!");
+  Serial.println();
+  Serial.print("IP");
+  Serial.println(WiFi.localIP());
+  randomSeed(analogRead(A0));
+
+ 
+  // Set analogPin's reference voltage
+  //analogReference(DEFAULT); // 5V
+ 
+
+
+ 
+
+}
+
+void loop() {
+   digitalWrite(resetPin, HIGH);
+  digitalWrite(resetPin, LOW);
+
+ 
+  // Get all 7 spectrum values from the MSGEQ7
+  for (int i = 0; i < 7; i++)
+  {
+    digitalWrite(strobePin, LOW);
+    delayMicroseconds(30); // Allow output to settle
+ 
+    spectrumValue[i] = analogRead(analogPin);
+ 
+    // Constrain any value above 1023 or below filterValue
+    spectrumValue[i] = constrain(spectrumValue[i], filterValue, 1023);
+ 
+ 
+    // Remap the value to a number between 0 and 255
+    spectrumValue[i] = map(spectrumValue[i], filterValue, 1023, 0, 255);
+ 
+    // Remove serial stuff after debugging
+    Serial.print(spectrumValue[i]);
+    Serial.print(" ");
+    digitalWrite(strobePin, HIGH);
+   }
+   
+  Color audioLights;
+  audioLights.animate(spectrumValue);
+
+  Serial.println();
+
+  String url = "?volume=";
+    url += String(audioLights.volume) + "&?color_h=";
+    url += String(audioLights.color_hue) + "&?pitch_h=";
+    url += String(audioLights.pitch_hue) + "&?repeat=";
+    url += String(audioLights.repeat) + "&?bpm=";
+    url += String(audioLights.bpm);
+  http.begin("http://192.168.1.1/audio");
+  http.addHeader("Content-Type","text/plain");
+  int httpCode = http.POST(url);
+  http.end();
+  //ESP.deepSleep(sleepTimeSeconds*1e-8);
+  // put your setup code here, to run once:
+  
+  // put your main code here, to run repeatedly:
+
+}
