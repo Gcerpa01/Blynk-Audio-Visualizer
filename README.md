@@ -23,3 +23,6 @@ This project focuses on reading audio frequencies and utilizing the information 
   
 ### Caveats
    The main issue with this project overall is that with the implemented code it will *require* a connection to WiFi network in order to function at all. Additionally, when being turned on after having already been turned on before, the software my require for the visualizer selection to be selected again in order to fully initiate the desired mode. Additionally, I have decided to leave my server and client attempts here as show of my steps. I have written an improved version of them in which the audio frequency values were being transferred over to the server, however I have refrained from providing the code as I want to modify it to utilize an ESP32 board as the information was being sent at a slow pace utilizing the ESP8266 Board.
+   
+## Final Thoughts
+   This was a fun first project to have done as an introduction to Arduinos and ESP boards. The completed software can be found in the **blynk** folder containing all of the code I wrote myself as well as the provided code I found with some online examples(credit is given within code for code utilized). This may be a project I improve on in the future and update here, but overall I have gotten a further understanding of circuits, voltage drops, current, classes as well as how servers and clients work.
