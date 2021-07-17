@@ -3,7 +3,7 @@
 # General Information
 This project focuses on reading audio frequencies and utilizing the information read in order to create an audio visualizer wirelessly. This is a project that has been in the making for a year as an introduction to Arduino and ESP in my free time. A timeline of my improvements and steps in this journey can be found [in this twitter thread](https://twitter.com/PunaticGerry/status/1292268597901811712?s=20) and **further information will be provided below**.
 
- ***Videos of the final product can also be found in [this twitter thread](https://twitter.com/PunaticGerry/status/1410468820255264772?s=20)***.
+ ***Videos of the final product can also be found in the twitter thread ***
 
 
 ## Steps and Resources
